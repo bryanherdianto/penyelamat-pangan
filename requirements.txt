@@ -10,8 +10,6 @@ torchvision>=0.15.0
 # Then install QNN version:
 #   pip install onnxruntime-qnn
 # Note: onnxruntime-qnn is for Qualcomm NPU devices
-onnxruntime-qnn>=1.16.0
-
 
 # Data Processing
 numpy>=1.24.0
