@@ -52,9 +52,12 @@ services:
       - PYTHONUNBUFFERED=1
       - DATABASE_URL=postgresql://user:password@postgres:5432/data
       - BLYNK_TOKEN=doDoL-_pRrwBVtx2zXCEyFXLbMOcQQ5E
+      - AI_SERVICE_URL=http://lstm_api:8000
     depends_on:
       postgres:
         condition: service_healthy
+      lstm_api:
+        condition: service_started
     restart: unless-stopped
 
   # LSTM Food Freshness AI Backend

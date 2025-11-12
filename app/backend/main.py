@@ -2,7 +2,7 @@ import os
 import time
 import threading
 import logging
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 import httpx
 from fastapi import FastAPI, HTTPException
@@ -12,10 +12,12 @@ from sqlalchemy import create_engine, Column, Integer, Float, DateTime, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
-# Configure logging
+# Configure logging with UTC+7 timezone
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
+# Set logging to use local timezone (UTC+7)
+logging.Formatter.converter = lambda *args: datetime.now(tz=timezone(timedelta(hours=7))).timetuple()
 logger = logging.getLogger(__name__)
 
 # Database configuration
@@ -24,7 +26,7 @@ DATABASE_URL = os.getenv(
 )
 
 # Blynk API configuration
-BLYNK_TOKEN = os.getenv("BLYNK_TOKEN", "doDoL-_pRrwBVtx2zXCEyFXLbMOcQQ5E")
+BLYNK_TOKEN = "doDoL-_pRrwBVtx2zXCEyFXLbMOcQQ5E"
 BLYNK_API_URL = f"https://blynk.cloud/external/api/getAll?token={BLYNK_TOKEN}"
 
 # SQLAlchemy setup
@@ -100,8 +102,6 @@ def fetch_blynk_data() -> dict | None:
 def transform_blynk_data(blynk_data: dict) -> dict | None:
     """
     Transform Blynk data format to database format
-    Input: {"v0": 9.4, "v1": 48.92, "v2": 59.5, "v3": 399, "v4": 399, "v5": 399, "v6": 0}
-    Output: {"temperatureC": 9.4, "temperatureF": 48.92, ...}
     """
     if not blynk_data:
         return None
@@ -114,7 +114,7 @@ def transform_blynk_data(blynk_data: dict) -> dict | None:
             "ppm_nh3": int(blynk_data.get("v3", 0)),
             "ppm_co2": int(blynk_data.get("v4", 0)),
             "ppm_c2h5oh": int(blynk_data.get("v5", 0)),
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.utcnow() + timedelta(hours=7),
         }
     except (ValueError, TypeError) as e:
         logger.error(f"Error transforming data: {e}")
@@ -222,8 +222,6 @@ async def shutdown_event():
 
 
 # API Endpoints
-
-
 @app.get("/")
 def root():
     """Root endpoint"""
@@ -379,6 +377,110 @@ def get_statistics():
                 ),
             },
         }
+    finally:
+        db.close()
+
+@app.get("/predict")
+async def predict_spoilage():
+    """Predict spoilage based on recent sensor readings"""
+    limit = 10
+    ai_service_url = os.getenv("AI_SERVICE_URL", "http://lstm_api:8000")
+    
+    db = SessionLocal()
+    try:
+        # Fetch last 10 records from database
+        records = (
+            db.query(SensorData)
+            .order_by(SensorData.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+        
+        if len(records) < limit:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": f"Not enough data. Need {limit} records, found {len(records)}",
+                    "message": "Please wait for more sensor data to be collected"
+                }
+            )
+        
+        # Reverse to get chronological order (oldest to newest)
+        records = list(reversed(records))
+        
+        # Format data for AI service
+        # Map database columns to sensor names expected by AI model
+        payload = {
+            "mq135_values": [float(r.ppm_co2) for r in records],      # MQ135 -> CO2
+            "mq3_values": [float(r.ppm_c2h5oh) for r in records],     # MQ3 -> Ethanol
+            "mics5524_values": [float(r.ppm_nh3) for r in records]    # MiCS5524 -> NH3
+        }
+        
+        logger.info(f"Sending prediction request with {len(records)} data points")
+        logger.debug(f"Payload: {payload}")
+        
+        # Send prediction request to AI service
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            ai_response = await client.post(
+                f"{ai_service_url}/predict",
+                json=payload
+            )
+            ai_response.raise_for_status()
+            prediction_result = ai_response.json()
+        
+        logger.info(f"AI Prediction: {prediction_result}")
+        
+        # Extract classification probability as integer (0-100)
+        classification_prob = int(prediction_result.get("classification_prob", 0))
+        classification_text = prediction_result.get("classification_text", "Unknown")
+        confidence = prediction_result.get("confidence", 0.0)
+        
+        # Send result to Blynk virtual pin V7
+        blynk_update_url = f"https://blynk.cloud/external/api/update?token={BLYNK_TOKEN}&v7={classification_prob}"
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            blynk_response = await client.get(blynk_update_url)
+            blynk_response.raise_for_status()
+        
+        logger.info(f"Updated Blynk V7 with value: {classification_prob}")
+        
+        return {
+            "status": "success",
+            "prediction": {
+                "classification": classification_text,
+                "probability": classification_prob,
+                "confidence": confidence,
+                "raw_prediction": prediction_result
+            },
+            "blynk_updated": True,
+            "blynk_pin": "V7",
+            "blynk_value": classification_prob,
+            "data_points_used": len(records),
+            "sensor_data": {
+                "mq135_co2": payload["mq135_values"],
+                "mq3_ethanol": payload["mq3_values"],
+                "mics5524_nh3": payload["mics5524_values"]
+            }
+        }
+        
+    except httpx.HTTPError as e:
+        logger.error(f"HTTP error during prediction: {e}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "Failed to get prediction from AI service",
+                "details": str(e)
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error during prediction: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "Internal server error during prediction",
+                "details": str(e)
+            }
+        )
     finally:
         db.close()
 

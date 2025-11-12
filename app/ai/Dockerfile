@@ -13,9 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies (excluding onnxruntime-qnn)
-COPY requirements.txt .
+COPY requirements.ai.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    grep -v "onnxruntime" requirements.txt > requirements_temp.txt && \
+    grep -v "onnxruntime" requirements.ai.txt > requirements_temp.txt && \
     pip install --no-cache-dir -r requirements_temp.txt && \
     rm requirements_temp.txt
 
