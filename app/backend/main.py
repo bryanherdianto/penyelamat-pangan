@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from sqlalchemy import create_engine, Column, Integer, Float, DateTime, text
 from sqlalchemy.ext.declarative import declarative_base
@@ -51,6 +52,14 @@ class SensorData(Base):
 
 # FastAPI app
 app = FastAPI(title="Sensor Data Collection API", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins (for development)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Background thread control
 _stop_event = threading.Event()
@@ -111,8 +120,8 @@ def transform_blynk_data(blynk_data: dict) -> dict | None:
             "temperatureC": float(blynk_data.get("v0", 0.0)),
             "temperatureF": float(blynk_data.get("v1", 0.0)),
             "humidity": float(blynk_data.get("v2", 0.0)),
-            "ppm_nh3": int(blynk_data.get("v3", 0)),
-            "ppm_co2": int(blynk_data.get("v4", 0)),
+            "ppm_co2": int(blynk_data.get("v3", 0)),
+            "ppm_nh3": int(blynk_data.get("v4", 0)),
             "ppm_c2h5oh": int(blynk_data.get("v5", 0)),
             "timestamp": datetime.utcnow() + timedelta(hours=7),
         }
