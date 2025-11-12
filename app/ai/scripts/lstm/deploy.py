@@ -29,7 +29,7 @@ app = FastAPI(
 
 # Global model instance
 model = None
-MODEL_PATH = "app/ai/models/lstm/lstm_food_freshness.onnx"
+MODEL_PATH = "..\\..\\models\\lstm\\lstm_food_freshness.onnx"
 
 
 class SensorData(BaseModel):
