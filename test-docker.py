@@ -16,9 +16,15 @@ from typing import Dict, Any
 
 
 class DockerServiceTester:
-    def __init__(self, lstm_url: str = "http://localhost:8000", ollama_url: str = "http://localhost:11434"):
+    def __init__(
+        self, 
+        lstm_url: str = "http://localhost:8000", 
+        ollama_url: str = "http://localhost:11434",
+        backend_url: str = "http://localhost:8001"
+    ):
         self.lstm_url = lstm_url
         self.ollama_url = ollama_url
+        self.backend_url = backend_url
         self.results = {}
     
     def print_header(self, text: str):
@@ -179,11 +185,60 @@ class DockerServiceTester:
             self.print_result("Ollama Falcon3:1b", False, str(e))
             return False
     
+    def test_backend_health(self) -> bool:
+        """Test Backend API health endpoint"""
+        try:
+            response = requests.get(f"{self.backend_url}/health", timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                db_status = data.get("database", "unknown")
+                total_records = data.get("total_records", 0)
+                self.print_result("Backend Health Check", True, f"DB: {db_status}, Records: {total_records}")
+                return True
+            else:
+                self.print_result("Backend Health Check", False, f"HTTP {response.status_code}")
+                return False
+        except requests.exceptions.ConnectionError:
+            self.print_result("Backend Health Check", False, "Connection refused - Is the container running?")
+            return False
+        except Exception as e:
+            self.print_result("Backend Health Check", False, str(e))
+            return False
+    
+    def test_backend_latest(self) -> bool:
+        """Test Backend API latest reading endpoint"""
+        try:
+            response = requests.get(f"{self.backend_url}/latest", timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                if "message" in data:
+                    self.print_result("Backend Latest Reading", True, data["message"])
+                else:
+                    temp = data.get("temperatureC", 0)
+                    humidity = data.get("humidity", 0)
+                    self.print_result("Backend Latest Reading", True, f"Temp: {temp}°C, Humidity: {humidity}%")
+                return True
+            else:
+                self.print_result("Backend Latest Reading", False, f"HTTP {response.status_code}")
+                return False
+        except Exception as e:
+            self.print_result("Backend Latest Reading", False, str(e))
+            return False
+    
     def run_all_tests(self):
         """Run all tests and print summary"""
         self.print_header("Docker Services Test Suite")
         
-        print("Testing LSTM Food Freshness API...")
+        # Test Backend API
+        print("Testing Backend Sensor Data API...")
+        print("-" * 70)
+        
+        self.test_backend_health()
+        time.sleep(0.5)
+        self.test_backend_latest()
+        
+        print("\n" + "-" * 70)
+        print("\nTesting LSTM Food Freshness API...")
         print("-" * 70)
         
         lstm_health = self.test_lstm_health()

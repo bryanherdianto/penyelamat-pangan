@@ -19,6 +19,44 @@ services:
       retries: 3
       start_period: 60s
 
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=data
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d data"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API - Sensor Data Collection
+  backend_api:
+    build:
+      context: .
+      dockerfile: app/backend/Dockerfile
+    container_name: backend_sensor_api
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./app/backend:/app/backend
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql://user:password@postgres:5432/data
+      - BLYNK_TOKEN=doDoL-_pRrwBVtx2zXCEyFXLbMOcQQ5E
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
   # LSTM Food Freshness AI Backend
   lstm_api:
     build:
@@ -39,3 +77,4 @@ services:
 
 volumes:
   ollama_data:
+  postgres_data:
