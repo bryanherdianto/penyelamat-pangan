@@ -158,7 +158,7 @@ async def predict(data: SensorData):
 def start_server(host: str = "0.0.0.0", port: int = 8000):
     """Start the API server"""
     print(f"\n{'='*70}")
-    print("� Starting Food Freshness AI Backend")
+    print("Starting Food Freshness AI Backend")
     print(f"{'='*70}\n")
     
     uvicorn.run(app, host=host, port=port)
