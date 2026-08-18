@@ -85,7 +85,7 @@ export async function GET() {
     return NextResponse.json({
       status: 'ok',
       ollama_url: OLLAMA_URL,
-      models: data.models?.map((m: any) => m.name) || [],
+      models: data.models?.map((m: { name: string }) => m.name) || [],
     });
   } catch (error) {
     return NextResponse.json(

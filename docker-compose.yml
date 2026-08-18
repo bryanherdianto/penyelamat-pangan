@@ -7,8 +7,10 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-      - ./ollama-entrypoint.sh:/entrypoint.sh
+      - ./ollama-entrypoint.sh:/entrypoint.sh:ro
     entrypoint: ["/bin/bash", "/entrypoint.sh"]
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-falcon3:1b}
     restart: unless-stopped
     # Note: Ollama will run on CPU in Docker
     # For Qualcomm NPU acceleration, run Ollama natively on Windows with QNN support
@@ -26,14 +28,14 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=data
+      - POSTGRES_USER=${POSTGRES_USER:-user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      - POSTGRES_DB=${POSTGRES_DB:-data}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d data"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-data}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -50,8 +52,8 @@ services:
       - ./sensor-api:/app
     environment:
       - PYTHONUNBUFFERED=1
-      - DATABASE_URL=postgresql://user:password@postgres:5432/data
-      - BLYNK_TOKEN=doDoL-_pRrwBVtx2zXCEyFXLbMOcQQ5E
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-data}
+      - BLYNK_TOKEN=${BLYNK_TOKEN:?set BLYNK_TOKEN in .env}
       - AI_SERVICE_URL=http://lstm_api:8000
     depends_on:
       postgres:

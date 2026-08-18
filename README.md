@@ -1,186 +1,70 @@
-# Food Freshness Deployment
+# Penyelamat Pangan
 
-Docker-based deployment for **PenyelamatPangan** (Food Savior) - An AI-powered food freshness monitoring system using LSTM neural networks and IoT sensors.
+IoT food-freshness monitoring. An ESP32 reports gas and climate readings to Blynk, a backend collects them into PostgreSQL, and an LSTM model predicts spoilage and remaining shelf life.
 
-## 📦 What's Inside
+## Data Flow
 
-This repository contains Docker configurations for:
+1. **ESP32 to Blynk** (push, ~1s). [`firmware/PenyelamatPangan.ino`](firmware/PenyelamatPangan.ino) reads DHT22 and the gas sensors and pushes each value to a virtual pin with `Blynk.virtualWrite()`. Blynk is just a key-value store for the latest value per pin — it never forwards anything.
 
-- **🤖 Freshness API** (`freshness-api/`) - Food freshness prediction using LSTM neural network
-- **🔌 Sensor API** (`sensor-api/`) - Sensor data collection and prediction endpoint
-- **🗄️ PostgreSQL** - Time-series sensor data storage
-- **🦙 Ollama LLM** - Falcon3:1b model for natural language processing
+2. **Blynk to sensor-api** (**poll**, 1s). This hop is commonly gotten backwards: Blynk does not push to the backend. A background thread in [`sensor-api/main.py`](sensor-api/main.py) calls `GET blynk.cloud/external/api/getAll?token=...` on a timer, maps `v0..v5` to columns, and inserts one row per poll. Nothing is event-driven, so a poll between two device writes duplicates the previous reading. At 1 row/sec that's ~86k rows/day.
 
-Plus **`frontend/`** (Next.js web app) and **`firmware/`** (ESP32 Arduino sketch).
+3. **Prediction, on demand only.** Nothing predicts automatically. `GET /predict` on sensor-api reads the last 10 rows (fewer returns HTTP 400), maps `ppm_co2`→`mq135_values`, `ppm_c2h5oh`→`mq3_values`, `ppm_nh3`→`mics5524_values`, and POSTs them to freshness-api, which runs the ONNX LSTM over the 10x3 sequence.
 
-## 🚀 Quick Start
+4. **Back to the device.** sensor-api writes the returned `classification_prob` to Blynk V7 via the update API; Blynk pushes it down to the ESP32's `BLYNK_WRITE(V7)` handler. So Blynk carries traffic both ways — push up, poll out, push back down.
 
-### Step 1: Start Docker Services
+5. **Frontend.** Next.js, not in `docker-compose.yml`; run it separately. It calls sensor-api on `:8001` for dashboard data and Ollama on `:11434` for chat. It never calls freshness-api directly.
 
-```powershell
-# Navigate to project directory
-cd C:\Users\ryana\Deployment
+| Pin  | Value                      | Source                                    |
+| ---- | -------------------------- | ----------------------------------------- |
+| `V0` | Temperature (C)            | DHT22                                     |
+| `V2` | Humidity (%)               | DHT22                                     |
+| `V3` | CO2 / air quality          | MQ135, GPIO 34                            |
+| `V4` | NH3                        | GPIO 35                                   |
+| `V5` | C2H5OH                     | MQ3                                       |
+| `V7` | Spoilage status (incoming) | written by sensor-api: 1 = fresh, 0 = bad |
 
-# Start all services
-docker-compose up -d
+## Structure
 
-# Check status
-docker-compose ps
+```
+firmware/         ESP32 sketch (sensors, LCD, Blynk)
+sensor-api/       Blynk poller + data API        :8001  (compose: backend_api)
+freshness-api/    LSTM prediction service        :8000  (compose: lstm_api)
+frontend/         Next.js dashboard + chatbot    :3000
+docker-compose.yml
 ```
 
-### Step 2: Verify Services
+## Quick Start
+
+Credentials come from a gitignored `.env`:
 
 ```powershell
-# Test sensor API
+cp .env.example .env    # then fill in BLYNK_TOKEN and POSTGRES_PASSWORD
+docker-compose up -d
 Invoke-RestMethod -Uri "http://localhost:8001/health"
-
-# Test freshness API
 Invoke-RestMethod -Uri "http://localhost:8000/health"
 ```
 
-## 📡 API Endpoints
-
-### Sensor API - Port 8001
-
-| Method | Endpoint | Description | Example |
-|--------|----------|-------------|---------|
-| GET | `/` | Root endpoint info | `http://localhost:8001/` |
-| GET | `/health` | Health check | `http://localhost:8001/health` |
-| GET | `/stats` | Data statistics | `http://localhost:8001/stats` |
-| GET | `/latest` | Latest sensor reading | `http://localhost:8001/latest` |
-| GET | `/data?limit=10` | Get recent data | `http://localhost:8001/data?limit=50` |
-| POST | `/data/insert` | Insert test data | See below |
-| GET | `/predict` | Predict freshness | `http://localhost:8001/predict` |
-
-### Freshness API - Port 8000
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/` | Root endpoint |
-| GET | `/health` | Model health status |
-| GET | `/model/info` | Model configuration |
-| POST | `/predict` | Make prediction |
-
-### Ollama LLM - Port 11434
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/tags` | List available models |
-| POST | `/api/generate` | Generate text with Falcon3:1b |
-
-## 💻 Example API Calls
-
-### Get Latest Sensor Data
+If freshness-api reports `model_not_loaded`, fetch the ONNX file from the repo root:
 
 ```powershell
-Invoke-RestMethod -Uri "http://localhost:8001/latest"
+python freshness-api/scripts/lstm/fetch-model.py
 ```
 
-### Get Multiple Readings
+Frontend: `cd frontend; npm install; npm run dev`.
+Firmware: `cp firmware/secrets.h.example firmware/secrets.h`, fill in the Blynk token and WiFi credentials, then open the sketch in Arduino IDE and flash. Needs the Blynk, DHT sensor, and LiquidCrystal_I2C libraries.
 
-```powershell
-# Get last 50 records
-Invoke-RestMethod -Uri "http://localhost:8001/data?limit=50"
+## API
+
+**sensor-api :8001** — `/health`, `/latest`, `/data?limit=10` (max 1000), `/stats`, `/predict`. Interactive docs at `/docs`.
+
+**freshness-api :8000** — `/health`, `/model/info`, `POST /predict`. The POST body needs exactly 10 values in each array:
+
+```json
+{ "mq135_values": [...10], "mq3_values": [...10], "mics5524_values": [...10] }
 ```
 
-### Predict Food Freshness
+It returns `classification_text`, `classification_prob` (sigmoid, 0-1), `classification_label` (1 = Fresh, 0 = Bad, the value written to V7), `confidence`, `rsl_hours`, `status`.
 
-```powershell
-# Automatically uses last 10 readings from database
-Invoke-RestMethod -Uri "http://localhost:8001/predict"
-```
+**Ollama :11434** — `/api/tags`, `POST /api/generate` with `$OLLAMA_MODEL`, pulled on startup by `ollama-entrypoint.sh`.
 
-### Direct Freshness Prediction
-
-```powershell
-$body = @{
-    mq135_values = @(151.0, 148.0, 155.0, 142.0, 159.0, 147.0, 153.0, 145.0, 156.0, 149.0)
-    mq3_values = @(127.0, 123.0, 131.0, 129.0, 125.0, 133.0, 122.0, 128.0, 130.0, 126.0)
-    mics5524_values = @(182.0, 178.0, 186.0, 180.0, 184.0, 179.0, 187.0, 181.0, 183.0, 185.0)
-} | ConvertTo-Json
-
-Invoke-RestMethod -Uri "http://localhost:8000/predict" -Method Post -Body $body -ContentType "application/json"
-```
-
-### Ollama Text Generation
-
-```powershell
-$body = @{
-    model = "falcon3:1b"
-    prompt = "Say 'Hello from Falcon3!' in one sentence."
-    stream = $false
-} | ConvertTo-Json
-
-Invoke-RestMethod -Uri "http://localhost:11434/api/generate" -Method Post -Body $body -ContentType "application/json"
-```
-
-## 🔧 Docker Commands
-
-### Basic Operations
-
-```powershell
-# Start services
-docker-compose up -d
-
-# Stop services
-docker-compose down
-
-# Restart service
-docker-compose restart backend_api
-
-# Rebuild after code changes
-docker-compose up -d --build
-
-# View logs
-docker-compose logs -f backend_api
-```
-
-### Database Access
-
-```powershell
-# Connect to PostgreSQL
-docker exec -it postgres_db psql -U user -d data
-
-# Quick query
-docker exec postgres_db psql -U user -d data -c "SELECT COUNT(*) FROM data;"
-```
-
-## 🧪 Testing Scripts
-
-```powershell
-# Test all services
-python test-docker.py
-
-# Test prediction pipeline with real data
-python test-prediction-pipeline.py
-
-# Populate database with test data
-python populate-database.py
-```
-
-## 🌐 Service URLs
-
-| Service | URL | Documentation |
-|---------|-----|---------------|
-| Sensor API | http://localhost:8001 | http://localhost:8001/docs |
-| Freshness API | http://localhost:8000 | http://localhost:8000/docs |
-| Ollama | http://localhost:11434 | - |
-| PostgreSQL | localhost:5432 | - |
-
-## 📁 Project Structure
-
-```
-penyelamat-pangan/
-├── freshness-api/           # LSTM freshness prediction service (port 8000)
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── models/lstm/         # ONNX model
-│   └── scripts/lstm/        # Inference + deploy scripts
-├── sensor-api/              # Sensor data collection API (port 8001)
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── main.py              # FastAPI app
-├── frontend/                # Next.js web app
-├── firmware/                # ESP32 Arduino sketch
-└── docker-compose.yml       # Service orchestration
-```
+Postgres is on `:5432`, credentials from `.env`.

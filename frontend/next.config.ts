@@ -1,14 +1,7 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'picsum.dev',
-      },
-    ],
-  },
-};
+// No remote image hosts: the picsum.dev placeholder avatar was removed along
+// with the hardcoded profile block in the header.
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

@@ -27,7 +27,11 @@ DATABASE_URL = os.getenv(
 )
 
 # Blynk API configuration
-BLYNK_TOKEN = "doDoL-_pRrwBVtx2zXCEyFXLbMOcQQ5E"
+BLYNK_TOKEN = os.getenv("BLYNK_TOKEN", "").strip()
+if not BLYNK_TOKEN:
+    raise RuntimeError(
+        "BLYNK_TOKEN is not set. Copy .env.example to .env and fill in your token."
+    )
 BLYNK_API_URL = f"https://blynk.cloud/external/api/getAll?token={BLYNK_TOKEN}"
 
 # SQLAlchemy setup
@@ -116,9 +120,12 @@ def transform_blynk_data(blynk_data: dict) -> dict | None:
         return None
 
     try:
+        # The device only reports Celsius (V0); Fahrenheit is derived here rather
+        # than read from V1, which the firmware never writes.
+        temperature_c = float(blynk_data.get("v0", 0.0))
         return {
-            "temperatureC": float(blynk_data.get("v0", 0.0)),
-            "temperatureF": float(blynk_data.get("v1", 0.0)),
+            "temperatureC": temperature_c,
+            "temperatureF": temperature_c * 9.0 / 5.0 + 32.0,
             "humidity": float(blynk_data.get("v2", 0.0)),
             "ppm_co2": int(blynk_data.get("v3", 0)),
             "ppm_nh3": int(blynk_data.get("v4", 0)),
@@ -439,31 +446,34 @@ async def predict_spoilage():
         
         logger.info(f"AI Prediction: {prediction_result}")
         
-        # Extract classification probability as integer (0-100)
-        classification_prob = int(prediction_result.get("classification_prob", 0))
+        # classification_prob is a sigmoid output in [0, 1]; the device expects the
+        # thresholded label on V7 (1 = Fresh, 0 = Bad), not the probability.
+        classification_label = int(prediction_result.get("classification_label", 0))
+        classification_prob = float(prediction_result.get("classification_prob", 0.0))
         classification_text = prediction_result.get("classification_text", "Unknown")
         confidence = prediction_result.get("confidence", 0.0)
-        
+
         # Send result to Blynk virtual pin V7
-        blynk_update_url = f"https://blynk.cloud/external/api/update?token={BLYNK_TOKEN}&v7={classification_prob}"
-        
+        blynk_update_url = f"https://blynk.cloud/external/api/update?token={BLYNK_TOKEN}&v7={classification_label}"
+
         async with httpx.AsyncClient(timeout=10.0) as client:
             blynk_response = await client.get(blynk_update_url)
             blynk_response.raise_for_status()
-        
-        logger.info(f"Updated Blynk V7 with value: {classification_prob}")
+
+        logger.info(f"Updated Blynk V7 with value: {classification_label} ({classification_text})")
         
         return {
             "status": "success",
             "prediction": {
                 "classification": classification_text,
+                "label": classification_label,
                 "probability": classification_prob,
                 "confidence": confidence,
                 "raw_prediction": prediction_result
             },
             "blynk_updated": True,
             "blynk_pin": "V7",
-            "blynk_value": classification_prob,
+            "blynk_value": classification_label,
             "data_points_used": len(records),
             "sensor_data": {
                 "mq135_co2": payload["mq135_values"],

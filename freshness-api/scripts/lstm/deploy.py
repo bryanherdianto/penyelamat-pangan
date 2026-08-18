@@ -53,6 +53,7 @@ class PredictionResponse(BaseModel):
     """Prediction result"""
     classification_text: str
     classification_prob: float
+    classification_label: int  # 1 = Fresh, 0 = Bad
     confidence: float
     rsl_hours: float
     status: str
@@ -146,6 +147,7 @@ async def predict(data: SensorData):
         return PredictionResponse(
             classification_text=result["classification_text"],
             classification_prob=result["classification_prob"],
+            classification_label=result["classification_label"],
             confidence=result["confidence"],
             rsl_hours=result["rsl_hours"],
             status="success"
