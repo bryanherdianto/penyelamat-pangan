@@ -6,10 +6,12 @@ Docker-based deployment for **PenyelamatPangan** (Food Savior) - An AI-powered f
 
 This repository contains Docker configurations for:
 
-- **🤖 AI Service (LSTM)** - Food freshness prediction using LSTM neural network
-- **🔌 Backend API** - Sensor data collection and prediction endpoint  
+- **🤖 Freshness API** (`freshness-api/`) - Food freshness prediction using LSTM neural network
+- **🔌 Sensor API** (`sensor-api/`) - Sensor data collection and prediction endpoint
 - **🗄️ PostgreSQL** - Time-series sensor data storage
 - **🦙 Ollama LLM** - Falcon3:1b model for natural language processing
+
+Plus **`frontend/`** (Next.js web app) and **`firmware/`** (ESP32 Arduino sketch).
 
 ## 🚀 Quick Start
 
@@ -29,16 +31,16 @@ docker-compose ps
 ### Step 2: Verify Services
 
 ```powershell
-# Test backend
+# Test sensor API
 Invoke-RestMethod -Uri "http://localhost:8001/health"
 
-# Test AI service  
+# Test freshness API
 Invoke-RestMethod -Uri "http://localhost:8000/health"
 ```
 
 ## 📡 API Endpoints
 
-### Backend API - Port 8001
+### Sensor API - Port 8001
 
 | Method | Endpoint | Description | Example |
 |--------|----------|-------------|---------|
@@ -50,7 +52,7 @@ Invoke-RestMethod -Uri "http://localhost:8000/health"
 | POST | `/data/insert` | Insert test data | See below |
 | GET | `/predict` | Predict freshness | `http://localhost:8001/predict` |
 
-### AI Service - Port 8000
+### Freshness API - Port 8000
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -88,7 +90,7 @@ Invoke-RestMethod -Uri "http://localhost:8001/data?limit=50"
 Invoke-RestMethod -Uri "http://localhost:8001/predict"
 ```
 
-### Direct AI Prediction
+### Direct Freshness Prediction
 
 ```powershell
 $body = @{
@@ -160,32 +162,25 @@ python populate-database.py
 
 | Service | URL | Documentation |
 |---------|-----|---------------|
-| Backend API | http://localhost:8001 | http://localhost:8001/docs |
-| AI Service | http://localhost:8000 | http://localhost:8000/docs |
+| Sensor API | http://localhost:8001 | http://localhost:8001/docs |
+| Freshness API | http://localhost:8000 | http://localhost:8000/docs |
 | Ollama | http://localhost:11434 | - |
 | PostgreSQL | localhost:5432 | - |
 
 ## 📁 Project Structure
 
 ```
-Deployment/
-├── app/
-│   ├── ai/                  # AI LSTM Service
-│   │   ├── Dockerfile
-│   │   ├── models/lstm/     # ONNX model
-│   │   └── scripts/lstm/    # Inference scripts
-│   └── backend/             # Backend API
-│       ├── Dockerfile  
-│       └── main.py          # FastAPI app
-├── docker-compose.yml       # Service orchestration
-├── requirements.txt         # AI dependencies
-└── requirements.backend.txt # Backend dependencies
+penyelamat-pangan/
+├── freshness-api/           # LSTM freshness prediction service (port 8000)
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── models/lstm/         # ONNX model
+│   └── scripts/lstm/        # Inference + deploy scripts
+├── sensor-api/              # Sensor data collection API (port 8001)
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── main.py              # FastAPI app
+├── frontend/                # Next.js web app
+├── firmware/                # ESP32 Arduino sketch
+└── docker-compose.yml       # Service orchestration
 ```
-
-## 🤝 Contributing
-
-Part of the **PenyelamatPangan** (Food Savior) project.
-
----
-
-**Status**: 🚀 Active Development

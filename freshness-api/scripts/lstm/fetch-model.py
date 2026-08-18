@@ -12,7 +12,7 @@ REPO_URL = "https://github.com/PenyelamatPangan/Models"
 MODEL_FILE = "lstm_food_freshness.onnx"
 BRANCH = "main"
 RAW_URL = f"https://raw.githubusercontent.com/PenyelamatPangan/Models/{BRANCH}/{MODEL_FILE}"
-MODEL_DIR = "app/ai/models/lstm"
+MODEL_DIR = "freshness-api/models/lstm"
 MODEL_PATH = os.path.join(MODEL_DIR, MODEL_FILE)
 
 # Colors for terminal output

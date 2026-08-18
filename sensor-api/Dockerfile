@@ -8,18 +8,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy backend requirements
-COPY requirements.backend.txt .
+# Copy service requirements
+COPY requirements.txt .
 
 # Install Python dependencies (psycopg2-binary doesn't need compilation)
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.backend.txt
+    pip install --no-cache-dir -r requirements.txt
 
-# Copy backend code only
-COPY ./app/backend /app/backend
+# Copy service code
+COPY . /app
 
 # Expose port
 EXPOSE 8001
 
-# Run the backend application
-CMD ["python", "backend/main.py"]
+# Run the sensor API
+CMD ["python", "main.py"]

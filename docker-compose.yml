@@ -38,16 +38,16 @@ services:
       timeout: 5s
       retries: 5
 
-  # Backend API - Sensor Data Collection
+  # Sensor API - Sensor Data Collection
   backend_api:
     build:
-      context: .
-      dockerfile: app/backend/Dockerfile
+      context: ./sensor-api
+      dockerfile: Dockerfile
     container_name: backend_sensor_api
     ports:
       - "8001:8001"
     volumes:
-      - ./app/backend:/app/backend
+      - ./sensor-api:/app
     environment:
       - PYTHONUNBUFFERED=1
       - DATABASE_URL=postgresql://user:password@postgres:5432/data
@@ -60,17 +60,17 @@ services:
         condition: service_started
     restart: unless-stopped
 
-  # LSTM Food Freshness AI Backend
+  # Freshness API - LSTM Food Freshness Prediction
   lstm_api:
     build:
-      context: .
-      dockerfile: app/ai/Dockerfile
+      context: ./freshness-api
+      dockerfile: Dockerfile
     container_name: food_freshness_ai
     ports:
       - "8000:8000"
     volumes:
-      - ./app/ai:/app
-      - ./app/ai/models:/app/models
+      - ./freshness-api:/app
+      - ./freshness-api/models:/app/models
     environment:
       - PYTHONUNBUFFERED=1
       - OLLAMA_HOST=http://ollama:11434

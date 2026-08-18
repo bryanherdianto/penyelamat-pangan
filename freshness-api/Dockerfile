@@ -13,14 +13,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies (excluding onnxruntime-qnn)
-COPY requirements.ai.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    grep -v "onnxruntime" requirements.ai.txt > requirements_temp.txt && \
+    grep -v "onnxruntime" requirements.txt > requirements_temp.txt && \
     pip install --no-cache-dir -r requirements_temp.txt && \
     rm requirements_temp.txt
 
 # Install ONNX Runtime QNN from wheel file
-# OPTION 1: Place .whl file in app/ai/ and uncomment the line below:
+# OPTION 1: Place .whl file in freshness-api/ and uncomment the line below:
 # COPY onnxruntime_qnn-*.whl /tmp/onnxruntime_qnn.whl
 # RUN pip install --no-cache-dir /tmp/onnxruntime_qnn.whl && rm /tmp/onnxruntime_qnn.whl
 
@@ -28,7 +28,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # RUN pip install --no-cache-dir onnxruntime>=1.16.0
 
 # Copy application code
-COPY ./app/ai /app
+COPY . /app
 
 # Create models directory
 RUN mkdir -p /app/models/lstm
