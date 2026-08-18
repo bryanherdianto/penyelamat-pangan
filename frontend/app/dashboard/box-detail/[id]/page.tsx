@@ -9,10 +9,37 @@ import { useSensorFeed, type SensorRow } from '../../../lib/api';
 import { useBoxes } from '../../../lib/boxes';
 
 const SERIES = [
-  { key: 'ppm_co2', label: 'CO₂', unit: 'ppm', color: 'var(--color-warn)', dot: 'bg-warn' },
+  { key: 'ppm_co2', label: 'CO₂', unit: 'ppm', color: 'var(--color-brand)', dot: 'bg-brand' },
   { key: 'ppm_nh3', label: 'NH₃', unit: 'ppm', color: 'var(--color-brand-light)', dot: 'bg-brand-light' },
   { key: 'ppm_c2h5oh', label: 'Ethanol', unit: 'ppm', color: 'var(--color-brand-deep)', dot: 'bg-brand-deep' },
 ] as const;
+
+/**
+ * Charts need a container with a definite height. `flex-1` alone resolves to 0
+ * on first paint, which makes ResponsiveContainer warn about width(-1)/height(-1),
+ * so every chart gets a fixed-height wrapper instead.
+ */
+function SensorChart({ data, color }: { data: { x: string; value: number }[]; color: string }) {
+  return (
+    <div className="h-52 w-full">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+        <LineChart data={data} margin={{ top: 5, right: 8, bottom: 0, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-line)" />
+          <XAxis dataKey="x" stroke="var(--color-ink-faint)" fontSize={10} minTickGap={24} />
+          <YAxis stroke="var(--color-ink-faint)" fontSize={10} width={40} />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: 'var(--color-surface)',
+              border: '1px solid var(--color-line)',
+              borderRadius: '8px',
+            }}
+          />
+          <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={false} isAnimationActive={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 export default function BoxDetailPage() {
   const params = useParams();
@@ -59,38 +86,43 @@ export default function BoxDetailPage() {
         />
 
         {rowsError && (
-          <div className="mb-4 px-4 py-3 rounded-xl bg-danger-soft text-danger text-sm">{rowsError}</div>
+          <div className="mb-4 px-4 py-3 rounded-xl bg-alert-soft text-alert text-sm">{rowsError}</div>
         )}
         {!box && boxes.length > 0 && (
-          <div className="mb-4 px-4 py-3 rounded-xl bg-warn-soft text-warn text-sm">
+          <div className="mb-4 px-4 py-3 rounded-xl bg-surface-muted text-ink-muted text-sm">
             Box {boxId} is not in your configured boxes.
           </div>
         )}
 
         {/* Summary cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 lg:gap-4 mb-4 lg:mb-6">
+          {/* Three states, not two: no prediction yet is neutral, not an alert. */}
           <div
-            className={`rounded-2xl p-4 lg:p-6 text-white relative overflow-hidden ${
-              isFresh ? 'bg-linear-to-br from-brand to-brand-deep' : 'bg-linear-to-br from-warn to-danger'
+            className={`rounded-2xl p-4 lg:p-6 border ${
+              classification == null
+                ? 'bg-surface border-line text-ink'
+                : isFresh
+                  ? 'bg-brand-deep border-brand-deep text-white'
+                  : 'bg-alert border-alert text-white'
             }`}
           >
-            <span className="text-sm opacity-90">Status</span>
+            <span className={`text-sm ${classification == null ? 'text-ink-muted' : 'opacity-90'}`}>Status</span>
             <p className="text-4xl font-semibold mb-1 mt-2 wrap-break-word">
-              {loadingPredict ? '…' : classification ?? '—'}
+              {loadingPredict ? '...' : classification ?? 'Unknown'}
             </p>
-            <p className="text-xs opacity-85">
+            <p className={`text-xs ${classification == null ? 'text-ink-muted' : 'opacity-85'}`}>
               {predictError
                 ? 'Waiting for 10 readings'
                 : probabilityPct != null && confidencePct != null
-                  ? `Prob ${probabilityPct}% • Confidence ${confidencePct.toFixed(0)}%`
-                  : '—'}
+                  ? `Prob ${probabilityPct}% / Confidence ${confidencePct.toFixed(0)}%`
+                  : 'No prediction yet'}
             </p>
           </div>
 
           <div className="bg-surface rounded-2xl p-4 lg:p-6 border border-line">
             <span className="text-xs lg:text-sm text-ink-muted">Shelf Life</span>
             <p className="text-3xl lg:text-4xl font-semibold mb-2 mt-2 wrap-break-word">
-              {loadingPredict ? '…' : rslHours != null ? `${rslDays}d ${rslRemHours}h` : '—'}
+              {loadingPredict ? '...' : rslHours != null ? `${rslDays}d ${rslRemHours}h` : '-'}
             </p>
             <p className="text-xs text-ink-muted">
               {spoilDate ? (
@@ -106,7 +138,7 @@ export default function BoxDetailPage() {
           <div className="bg-surface rounded-2xl p-4 lg:p-6 border border-line">
             <span className="text-xs lg:text-sm text-ink-muted">Temperature</span>
             <p className="text-3xl lg:text-4xl font-semibold mb-2 mt-2 wrap-break-word">
-              {loadingRows ? '…' : latest ? `${latest.temperatureC.toFixed(1)}°C` : '—'}
+              {loadingRows ? '...' : latest ? `${latest.temperatureC.toFixed(1)}°C` : '-'}
             </p>
             <p className="text-xs text-ink-muted">
               {latest ? `${latest.temperatureF.toFixed(1)}°F` : 'No readings'}
@@ -116,7 +148,7 @@ export default function BoxDetailPage() {
           <div className="bg-surface rounded-2xl p-4 lg:p-6 border border-line">
             <span className="text-xs lg:text-sm text-ink-muted">Humidity</span>
             <p className="text-3xl lg:text-4xl font-semibold mb-2 mt-2 wrap-break-word">
-              {loadingRows ? '…' : latest ? `${latest.humidity.toFixed(1)}%` : '—'}
+              {loadingRows ? '...' : latest ? `${latest.humidity.toFixed(1)}%` : '-'}
             </p>
             <p className="text-xs text-ink-muted">Relative humidity</p>
           </div>
@@ -133,7 +165,7 @@ export default function BoxDetailPage() {
                   <div className="min-w-0">
                     <p className="text-xs text-ink-muted">{s.label}</p>
                     <p className="text-sm font-semibold">
-                      {loadingRows ? '…' : latest ? `${latest[s.key]} ${s.unit}` : '—'}
+                      {loadingRows ? '...' : latest ? `${latest[s.key]} ${s.unit}` : '-'}
                     </p>
                   </div>
                 </div>
@@ -141,56 +173,20 @@ export default function BoxDetailPage() {
             </div>
           </div>
 
-          <div className="lg:col-span-2 bg-surface rounded-2xl p-4 lg:p-6 border border-line flex flex-col">
-            <h4 className="text-sm font-medium text-ink-muted mb-3 shrink-0">
+          <div className="lg:col-span-2 bg-surface rounded-2xl p-4 lg:p-6 border border-line">
+            <h4 className="text-sm font-medium text-ink-muted mb-3">
               CO₂ history (last {rowsAsc.length} readings)
             </h4>
-            <div className="flex-1 min-h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={seriesFor('ppm_co2')}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-line)" />
-                  <XAxis dataKey="x" stroke="var(--color-ink-faint)" fontSize={10} minTickGap={24} />
-                  <YAxis stroke="var(--color-ink-faint)" fontSize={10} width={40} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'var(--color-surface)',
-                      border: '1px solid var(--color-line)',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Line type="monotone" dataKey="value" stroke="var(--color-warn)" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            <SensorChart data={seriesFor('ppm_co2')} color={SERIES[0].color} />
           </div>
         </div>
 
         {/* NH3 + Ethanol history */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {SERIES.filter((s) => s.key !== 'ppm_co2').map((s) => (
-            <div
-              key={s.key}
-              className="bg-surface rounded-2xl p-4 lg:p-6 border border-line flex flex-col h-64"
-            >
-              <h4 className="text-sm font-medium text-ink-muted mb-3 shrink-0">{s.label} history</h4>
-              {/* min-h-0 lets the chart shrink inside the fixed-height card instead of overflowing it */}
-              <div className="flex-1 min-h-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={seriesFor(s.key)}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-line)" />
-                    <XAxis dataKey="x" stroke="var(--color-ink-faint)" fontSize={10} minTickGap={24} />
-                    <YAxis stroke="var(--color-ink-faint)" fontSize={10} width={40} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'var(--color-surface)',
-                        border: '1px solid var(--color-line)',
-                        borderRadius: '8px',
-                      }}
-                    />
-                    <Line type="monotone" dataKey="value" stroke={s.color} strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+            <div key={s.key} className="bg-surface rounded-2xl p-4 lg:p-6 border border-line">
+              <h4 className="text-sm font-medium text-ink-muted mb-3">{s.label} history</h4>
+              <SensorChart data={seriesFor(s.key)} color={s.color} />
             </div>
           ))}
         </div>

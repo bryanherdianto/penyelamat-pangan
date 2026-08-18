@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { ArrowRight, Bot, Droplets, MessageSquare, Plus, Send, Thermometer, TrendingUp, X } from 'lucide-react';
 
 import Sidebar from '../components/sidebar';
 import Topbar from '../components/topbar';
@@ -115,50 +116,49 @@ export default function Dashboard() {
         />
 
         {rowsError && (
-          <div className="mb-4 px-4 py-3 rounded-xl bg-danger-soft text-danger text-sm">{rowsError}</div>
+          <div className="mb-4 px-4 py-3 rounded-xl bg-alert-soft text-alert text-sm">{rowsError}</div>
         )}
 
         {/* Live readings - every card below is sourced from sensor-api */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-          <div className="bg-surface rounded-xl shadow-sm p-4 lg:p-6">
+          <div className="bg-surface rounded-xl border border-line p-4 lg:p-6">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-medium text-ink-muted">Temperature</h3>
+              <Thermometer size={18} className="text-ink-faint" />
             </div>
             <p className="text-3xl lg:text-4xl font-bold wrap-break-word">
-              {loadingRows ? '…' : latest ? `${latest.temperatureC.toFixed(1)}°C` : '—'}
+              {loadingRows ? '...' : latest ? `${latest.temperatureC.toFixed(1)}°C` : '-'}
             </p>
             <p className="text-xs text-ink-muted mt-1">
               {latest ? `${latest.temperatureF.toFixed(1)}°F` : 'No readings yet'}
             </p>
           </div>
 
-          <div className="bg-surface rounded-xl shadow-sm p-4 lg:p-6">
+          <div className="bg-surface rounded-xl border border-line p-4 lg:p-6">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-medium text-ink-muted">Humidity</h3>
+              <Droplets size={18} className="text-ink-faint" />
             </div>
             <p className="text-3xl lg:text-4xl font-bold wrap-break-word">
-              {loadingRows ? '…' : latest ? `${latest.humidity.toFixed(1)}%` : '—'}
+              {loadingRows ? '...' : latest ? `${latest.humidity.toFixed(1)}%` : '-'}
             </p>
             <p className="text-xs text-ink-muted mt-1">Relative humidity</p>
           </div>
 
           {/* Status */}
-          <div className="bg-surface rounded-xl shadow-sm p-4 lg:p-6">
+          <div className="bg-surface rounded-xl border border-line p-4 lg:p-6">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-medium text-ink-muted">Status</h3>
-              <div className={`p-2 rounded-lg ${isFresh ? 'bg-fresh-soft' : 'bg-warn-soft'}`}>
-                <svg
-                  className={`w-5 h-5 ${isFresh ? 'text-fresh' : 'text-warn'}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-              </div>
+              <span className={`p-2 rounded-lg ${isFresh ? 'bg-brand-soft text-brand' : 'bg-surface-muted text-ink-muted'}`}>
+                <TrendingUp size={18} />
+              </span>
             </div>
-            <p className="text-3xl lg:text-4xl font-bold wrap-break-word">
-              {loadingPredict ? '…' : classification ?? '—'}
+            <p
+              className={`text-3xl lg:text-4xl font-bold wrap-break-word ${
+                classification == null ? '' : isFresh ? 'text-brand' : 'text-alert'
+              }`}
+            >
+              {loadingPredict ? '...' : classification ?? '-'}
             </p>
             <p className="text-xs text-ink-muted mt-1">
               {predictError ? 'Needs 10 readings to predict' : `${boxes.length} of ${MAX_BOXES} boxes configured`}
@@ -166,7 +166,7 @@ export default function Dashboard() {
           </div>
 
           {/* Condition gauge */}
-          <div className="bg-surface rounded-xl shadow-sm p-4 lg:p-6">
+          <div className="bg-surface rounded-xl border border-line p-4 lg:p-6">
             <h3 className="text-sm font-medium text-ink-muted mb-2">Condition</h3>
             <div className="text-center">
               <div className="w-24 h-24 lg:w-28 lg:h-28 mx-auto mb-1 relative">
@@ -177,7 +177,7 @@ export default function Dashboard() {
                     cy="50"
                     r="40"
                     fill="none"
-                    stroke={isFresh ? 'var(--color-fresh)' : 'var(--color-warn)'}
+                    stroke={isFresh ? 'var(--color-brand)' : 'var(--color-alert)'}
                     strokeWidth="8"
                     strokeDasharray={GAUGE_CIRCUMFERENCE}
                     strokeDashoffset={
@@ -190,7 +190,7 @@ export default function Dashboard() {
                   />
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-2xl font-bold">{freshnessPct == null ? '—' : `${freshnessPct}%`}</span>
+                  <span className="text-2xl font-bold">{freshnessPct == null ? '-' : `${freshnessPct}%`}</span>
                 </div>
               </div>
               <p className="text-xs text-ink-muted">Freshness probability</p>
@@ -199,7 +199,7 @@ export default function Dashboard() {
         </div>
 
         {/* Box Configuration */}
-        <section className="bg-surface rounded-xl shadow-sm p-4 lg:p-6">
+        <section className="bg-surface rounded-xl border border-line p-4 lg:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
             <h2 className="text-lg lg:text-xl font-semibold">Box Configuration</h2>
             <div className="flex gap-3">
@@ -210,9 +210,7 @@ export default function Dashboard() {
                   boxes.length >= MAX_BOXES ? 'bg-ink-faint cursor-not-allowed' : 'bg-brand hover:bg-brand-dark'
                 }`}
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
+                <Plus size={16} />
                 Add Box
               </button>
               <button
@@ -236,13 +234,7 @@ export default function Dashboard() {
 
           {boxes.length > 0 && boxes.length < MAX_BOXES && (
             <div className="relative hidden lg:flex justify-center items-center mt-4">
-              <Image
-                src="/truk-final.png"
-                alt=""
-                width={800}
-                height={400}
-                className="w-full h-auto max-w-4xl"
-              />
+              <Image src="/truk-final.png" alt="" width={800} height={400} className="w-full h-auto max-w-4xl" />
               <div className="absolute inset-0 flex items-center justify-end pr-[23%] pb-[10%]">
                 <div className="relative w-[50%] h-[60%] flex flex-wrap items-end justify-center gap-2 pb-4">
                   {boxes.map((box, index) => (
@@ -275,10 +267,10 @@ export default function Dashboard() {
           {boxes.length > 0 && (
             <div className="mt-6">
               <p className="text-xs text-ink-muted mb-3">
-                Readings are shared across boxes — sensor-api exposes a single device stream.
+                Readings are shared across boxes - sensor-api exposes a single device stream.
               </p>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[32rem] border border-line rounded-lg overflow-hidden">
+                <table className="w-full min-w-lg border border-line rounded-lg overflow-hidden">
                   <thead className="bg-surface-muted">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-ink-muted uppercase">Box</th>
@@ -298,13 +290,13 @@ export default function Dashboard() {
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <p className="text-sm font-medium max-w-[16rem] truncate">{box.description || '—'}</p>
+                          <p className="text-sm font-medium max-w-[16rem] truncate">{box.description || '-'}</p>
                         </td>
                         <td className="px-4 py-3 text-sm text-ink-muted">
-                          {latest ? `${latest.temperatureC.toFixed(1)}°C` : '—'}
+                          {latest ? `${latest.temperatureC.toFixed(1)}°C` : '-'}
                         </td>
                         <td className="px-4 py-3 text-sm text-ink-muted">
-                          {latest ? `${latest.humidity.toFixed(1)}%` : '—'}
+                          {latest ? `${latest.humidity.toFixed(1)}%` : '-'}
                         </td>
                         <td className="px-4 py-3">
                           <span
@@ -312,11 +304,11 @@ export default function Dashboard() {
                               classification == null
                                 ? 'bg-surface-muted text-ink-muted'
                                 : isFresh
-                                  ? 'bg-fresh-soft text-fresh'
-                                  : 'bg-danger-soft text-danger'
+                                  ? 'bg-brand-soft text-brand-dark'
+                                  : 'bg-alert-soft text-alert'
                             }`}
                           >
-                            {classification ?? '—'}
+                            {classification ?? '-'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -390,21 +382,22 @@ export default function Dashboard() {
                     setShowDetailModal(false);
                     router.push(`/dashboard/box-detail/${selectedBox.id}`);
                   }}
-                  className="text-brand hover:text-brand-dark text-sm font-medium"
+                  className="inline-flex items-center gap-1 text-brand hover:text-brand-dark text-sm font-medium"
                 >
-                  Full details →
+                  Full details
+                  <ArrowRight size={16} />
                 </button>
               </div>
 
               <dl className="space-y-2 text-sm">
                 {[
-                  ['Description', selectedBox.description || '—'],
-                  ['Humidity', latest ? `${latest.humidity.toFixed(1)}%` : '—'],
-                  ['Temperature', latest ? `${latest.temperatureC.toFixed(1)}°C` : '—'],
-                  ['CO₂', latest ? `${latest.ppm_co2} ppm` : '—'],
-                  ['NH₃', latest ? `${latest.ppm_nh3} ppm` : '—'],
-                  ['Ethanol', latest ? `${latest.ppm_c2h5oh} ppm` : '—'],
-                  ['Status', classification ?? '—'],
+                  ['Description', selectedBox.description || '-'],
+                  ['Humidity', latest ? `${latest.humidity.toFixed(1)}%` : '-'],
+                  ['Temperature', latest ? `${latest.temperatureC.toFixed(1)}°C` : '-'],
+                  ['CO₂', latest ? `${latest.ppm_co2} ppm` : '-'],
+                  ['NH₃', latest ? `${latest.ppm_nh3} ppm` : '-'],
+                  ['Ethanol', latest ? `${latest.ppm_c2h5oh} ppm` : '-'],
+                  ['Status', classification ?? '-'],
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between items-start gap-4 py-2 border-b border-line">
                     <dt className="text-ink-muted shrink-0">{label}</dt>
@@ -466,7 +459,7 @@ export default function Dashboard() {
                     </button>
                     <button
                       onClick={handleDeleteBox}
-                      className="w-full px-4 py-2 bg-danger text-white rounded-lg hover:opacity-90 text-sm"
+                      className="w-full px-4 py-2 bg-alert text-white rounded-lg hover:opacity-90 text-sm"
                     >
                       Delete Box
                     </button>
@@ -491,39 +484,29 @@ export default function Dashboard() {
         {/* Chatbot */}
         <button
           onClick={() => setShowChatbot((v) => !v)}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-linear-to-br from-brand-light to-brand-dark text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40"
+          className="fixed bottom-6 right-6 w-14 h-14 bg-brand text-white rounded-full shadow-lg hover:bg-brand-dark hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40"
           aria-label={showChatbot ? 'Close AI assistant' : 'Open AI assistant'}
         >
-          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d={
-                showChatbot
-                  ? 'M6 18L18 6M6 6l12 12'
-                  : 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z'
-              }
-            />
-          </svg>
+          {showChatbot ? <X size={26} /> : <MessageSquare size={26} />}
         </button>
 
         {showChatbot && (
           <div className="fixed bottom-24 right-4 sm:right-6 w-[calc(100vw-2rem)] sm:w-96 max-h-[calc(100vh-8rem)] h-[500px] bg-surface rounded-2xl shadow-2xl border border-line z-40 flex flex-col overflow-hidden">
-            <div className="bg-linear-to-r from-brand to-brand-deep p-4 text-white shrink-0">
+            <div className="bg-brand-deep p-4 text-white shrink-0">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold">AI Assistant</h3>
-                  <p className="text-xs opacity-90">Powered by Ollama</p>
+                <div className="flex items-center gap-3">
+                  <Bot size={22} />
+                  <div>
+                    <h3 className="font-semibold">AI Assistant</h3>
+                    <p className="text-xs opacity-90">Powered by Ollama</p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setShowChatbot(false)}
                   className="hover:bg-white/20 p-1 rounded-lg transition-colors"
                   aria-label="Close"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <X size={20} />
                 </button>
               </div>
             </div>
@@ -536,7 +519,7 @@ export default function Dashboard() {
                       className={`p-3 rounded-lg shadow-sm max-w-[85%] ${
                         msg.role === 'user'
                           ? 'bg-brand text-white rounded-tr-none'
-                          : 'bg-surface text-ink rounded-tl-none'
+                          : 'bg-surface text-ink rounded-tl-none border border-line'
                       }`}
                     >
                       <p className="text-sm whitespace-pre-wrap wrap-break-word">{msg.content}</p>
@@ -548,8 +531,8 @@ export default function Dashboard() {
                 ))}
 
                 {isLoading && (
-                  <div className="bg-surface p-3 rounded-lg rounded-tl-none shadow-sm inline-block">
-                    <p className="text-sm text-ink-muted">Thinking…</p>
+                  <div className="bg-surface border border-line p-3 rounded-lg rounded-tl-none shadow-sm inline-block">
+                    <p className="text-sm text-ink-muted">Thinking...</p>
                   </div>
                 )}
               </div>
@@ -562,7 +545,7 @@ export default function Dashboard() {
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                  placeholder="Type your message…"
+                  placeholder="Type your message..."
                   disabled={isLoading}
                   className="flex-1 min-w-0 px-4 py-2 border border-line rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-brand disabled:bg-surface-muted"
                 />
@@ -572,9 +555,7 @@ export default function Dashboard() {
                   className="w-10 h-10 bg-brand text-white rounded-full flex items-center justify-center hover:bg-brand-dark transition-colors shrink-0 disabled:bg-ink-faint disabled:cursor-not-allowed"
                   aria-label="Send"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14m0 0l-6-6m6 6l-6 6" />
-                  </svg>
+                  <Send size={18} />
                 </button>
               </div>
             </div>

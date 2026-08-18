@@ -1,44 +1,41 @@
 @import "tailwindcss";
 
 /*
-  Single source of truth for the app palette. Every page pulls from these
-  tokens - no raw hex values in components.
+  One green ramp + neutrals + a single alert colour. Deliberately no yellow
+  and no second accent hue: state is shown by position on the green ramp,
+  and only a genuine problem is allowed to be red.
 */
 @theme {
   /* Surfaces */
-  --color-page: #fafafa;
+  --color-page: #f5f7f5;
   --color-surface: #ffffff;
-  --color-surface-muted: #f7f7f7;
-  --color-line: #e5e7eb;
+  --color-surface-muted: #eef1ee;
+  --color-line: #e2e6e2;
 
-  /* Brand (green) */
-  --color-brand-soft: #dcfce7;
-  --color-brand-light: #4ade80;
-  --color-brand: #16a34a;
-  --color-brand-dark: #15803d;
-  --color-brand-deep: #166534;
+  /* Brand ramp - the only hue in the UI */
+  --color-brand-soft: #e6f2ea;
+  --color-brand-light: #6ab887;
+  --color-brand: #2e8b57;
+  --color-brand-dark: #1f6b41;
+  --color-brand-deep: #14492d;
 
   /* Text */
-  --color-ink: #111827;
-  --color-ink-muted: #6b7280;
-  --color-ink-faint: #9ca3af;
+  --color-ink: #16211b;
+  --color-ink-muted: #667069;
+  --color-ink-faint: #9aa39d;
 
-  /* Status */
-  --color-fresh: #16a34a;
-  --color-fresh-soft: #dcfce7;
-  --color-warn: #d97706;
-  --color-warn-soft: #fef3c7;
-  --color-danger: #dc2626;
-  --color-danger-soft: #fee2e2;
+  /* The one non-green accent, reserved for real failure states */
+  --color-alert: #b3261e;
+  --color-alert-soft: #fbeae8;
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 /*
-  The app is a light-only dashboard: every surface is explicitly painted.
-  No prefers-color-scheme override, which previously flipped the page
-  background to near-black while all the cards stayed white.
+  Light-only dashboard: every surface is explicitly painted. No
+  prefers-color-scheme override, which previously flipped the page background
+  to near-black while all the cards stayed white.
 */
 body {
   background: var(--color-page);
